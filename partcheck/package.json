@@ -1,0 +1,17 @@
+{
+  "name": "partcheck-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Photo-based spare-part inspection (PASS/FAIL) using Azure OpenAI vision",
+  "type": "module",
+  "scripts": {
+    "start": "node render-server.js",
+    "dev": "node --env-file=.env render-server.js"
+  },
+  "engines": {
+    "node": ">=20.6"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

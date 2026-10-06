@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#22303a" />
+  <title>PartCheck AI · Photo inspection</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%2322303a'/><path d='M20 34V20h14M66 20h14v14M80 66v14H66M34 80H20V66' stroke='%23f2c230' stroke-width='8' fill='none'/><path d='M36 52l10 10 20-24' stroke='%23fff' stroke-width='9' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar no-print">
+    <a class="brand" href="#" data-nav="setup" aria-label="PartCheck AI home">
+      <svg viewBox="0 0 100 100" aria-hidden="true"><path d="M20 34V20h14M66 20h14v14M80 66v14H66M34 80H20V66" stroke="currentColor" stroke-width="9" fill="none"/><path d="M36 52l10 10 20-24" stroke="#fff" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>PartCheck AI</span>
+    </a>
+    <nav class="nav">
+      <button type="button" data-nav="setup" class="active">New inspection</button>
+      <button type="button" data-nav="history">History</button>
+      <button type="button" id="btnSettings" aria-label="Settings">Settings</button>
+    </nav>
+  </header>
+
+  <ol class="steps no-print" id="steps" aria-label="Progress">
+    <li data-step="setup"><b>1</b> Item &amp; checklist</li>
+    <li data-step="capture"><b>2</b> Capture / live scan</li>
+    <li data-step="result"><b>3</b> Result</li>
+  </ol>
+
+  <main>
+    <!-- STEP 1: SETUP -->
+    <section class="view" id="view-setup">
+      <div class="grid-2">
+        <div class="panel">
+          <h2>What are you inspecting?</h2>
+          <label class="field">
+            <span>Item</span>
+            <select id="tplSelect"></select>
+          </label>
+          <div id="tplPreview" class="tpl-preview"></div>
+          <div class="row gap">
+            <button type="button" class="btn ghost" id="btnEditTpl">Edit checklist</button>
+            <button type="button" class="btn ghost" id="btnNewTpl">Create custom item</button>
+          </div>
+
+          <div id="editor" class="editor" hidden>
+            <h3 id="editorTitle">Custom item</h3>
+            <label class="field">
+              <span>Item name</span>
+              <input id="edName" placeholder="e.g. Fire extinguisher, Electrical panel, Laptop" maxlength="120" />
+            </label>
+            <label class="field">
+              <span>Details for the AI <em>(optional)</em></span>
+              <textarea id="edDesc" rows="2" placeholder="Model, size, anything that helps identify the parts"></textarea>
+            </label>
+            <button type="button" class="btn ai" id="btnSuggest">Suggest checklist with AI</button>
+
+            <div class="ed-angles" id="edAngles"></div>
+            <button type="button" class="btn ghost small" id="btnAddAngle">Add a view</button>
+
+            <label class="field">
+              <span>Parts that may show in any view <em>(one per line)</em></span>
+              <textarea id="edGeneral" rows="2" placeholder="e.g. Serial number label"></textarea>
+            </label>
+            <div class="row gap wrap">
+              <button type="button" class="btn primary" id="btnSaveTpl">Save item</button>
+              <button type="button" class="btn ghost" id="btnCancelTpl">Close</button>
+              <button type="button" class="btn danger-ghost" id="btnDeleteTpl">Delete item</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Inspection details</h2>
+          <label class="field"><span>Inspector name</span><input id="mInspector" maxlength="80" autocomplete="name" /></label>
+          <label class="field"><span>Serial / asset / job number</span><input id="mSerial" maxlength="80" /></label>
+          <label class="field"><span>Site or location</span><input id="mLocation" maxlength="120" /></label>
+          <label class="field"><span>Notes</span><textarea id="mNotes" rows="2" maxlength="500"></textarea></label>
+          <label class="check"><input type="checkbox" id="mGps" /> Add GPS location to photos</label>
+          <button type="button" class="btn primary big" id="btnLive">Start live scan</button>
+          <p class="muted small-note">Point the camera and move around the item. Parts are ticked automatically.</p>
+          <button type="button" class="btn ghost big" id="btnStart">Photo mode (one photo per view)</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 2: CAPTURE -->
+    <section class="view" id="view-capture" hidden>
+      <div class="capture-head">
+        <div>
+          <h2 id="capItem"></h2>
+          <p class="muted" id="capProgress"></p>
+        </div>
+        <button type="button" class="btn ghost small" id="btnExtraAngle">Add extra view</button>
+      </div>
+      <div class="chips" id="angleChips" role="tablist" aria-label="Views"></div>
+
+      <div class="capture-grid">
+        <div class="stage" id="stage">
+          <video id="video" playsinline muted autoplay></video>
+          <img id="preview" alt="Captured photo" hidden />
+          <div class="frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <div class="stage-label" id="stageLabel"></div>
+          <div class="qbar" id="qbar"></div>
+          <div class="nocam" id="nocam" hidden>
+            <p>Camera preview is not available here.</p>
+            <p class="muted">Use <b>Upload photo</b> below. On a phone it opens the camera directly.</p>
+          </div>
+        </div>
+
+        <div class="side">
+          <div class="panel tight">
+            <h3 id="angleName"></h3>
+            <p class="muted" id="angleGuide"></p>
+            <ul class="expect" id="angleParts"></ul>
+          </div>
+          <div class="controls">
+            <button type="button" class="shutter" id="btnShoot" aria-label="Take photo"><span></span></button>
+            <label class="btn ghost" id="lblUpload">
+              Upload photo
+              <input type="file" id="fileInput" accept="image/*" capture="environment" hidden />
+            </label>
+            <button type="button" class="btn ghost" id="btnRetake" hidden>Retake</button>
+            <button type="button" class="btn primary" id="btnNext" hidden>Next view</button>
+          </div>
+          <button type="button" class="btn primary big" id="btnEvaluate">Evaluate photos</button>
+          <button type="button" class="btn ghost small" id="btnBackSetup">Back to checklist</button>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- STEP 2b: LIVE SCAN -->
+    <section class="view" id="view-live" hidden>
+      <div class="capture-head">
+        <div>
+          <h2 id="lvItem"></h2>
+          <p class="muted" id="lvStats">Starting camera…</p>
+        </div>
+        <button type="button" class="btn ghost small" id="lvBack">Back to checklist</button>
+      </div>
+
+      <div class="capture-grid">
+        <div>
+          <div class="stage live-stage" id="lvStage">
+            <video id="lvVideo" playsinline muted autoplay></video>
+            <canvas id="lvOverlay" aria-hidden="true"></canvas>
+            <div class="frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+            <div class="lv-top">
+              <span class="lv-state" id="lvState">Ready</span>
+              <span class="lv-view" id="lvView"></span>
+            </div>
+            <div class="lv-hint" id="lvHint" aria-live="polite"></div>
+            <div class="lv-ring" id="lvRing" aria-label="Checklist progress">
+              <svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15.5" class="bg"/><circle cx="18" cy="18" r="15.5" class="fg" id="lvRingFg"/></svg>
+              <b id="lvPct">0%</b>
+            </div>
+            <div class="qbar" id="lvQbar"></div>
+            <div class="lv-done" id="lvDone" hidden><span>✓</span><p>All parts found</p></div>
+            <div class="nocam" id="lvNocam" hidden>
+              <p>Camera is not available.</p>
+              <p class="muted">Live scan needs camera permission and HTTPS. Use Photo mode instead.</p>
+            </div>
+          </div>
+          <div class="controls">
+            <button type="button" class="btn primary" id="lvToggle">Pause scan</button>
+            <button type="button" class="btn ghost" id="lvTorch" hidden>Torch</button>
+            <button type="button" class="btn ghost" id="lvFlip">Switch camera</button>
+          </div>
+        </div>
+
+        <div class="side">
+          <div class="panel tight">
+            <h3>Live checklist</h3>
+            <p class="muted" id="lvNext"></p>
+            <div id="lvList" class="lv-list"></div>
+          </div>
+          <div class="panel tight lv-defects" id="lvDefects" hidden></div>
+          <button type="button" class="btn primary big" id="lvFinish">Finish &amp; see result</button>
+          <button type="button" class="btn ghost small" id="lvDeep">Run deep check on saved frames</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 3: RESULT -->
+    <section class="view" id="view-result" hidden></section>
+
+    <!-- HISTORY -->
+    <section class="view" id="view-history" hidden>
+      <div class="capture-head">
+        <h2>Saved inspections</h2>
+        <div class="row gap">
+          <button type="button" class="btn ghost small" id="btnExportAll">Export all (JSON)</button>
+          <button type="button" class="btn danger-ghost small" id="btnClearHistory">Clear history</button>
+        </div>
+      </div>
+      <p class="muted">Saved on this device only. Export regularly if you need a permanent record.</p>
+      <div id="historyList" class="history"></div>
+    </section>
+  </main>
+
+  <dialog id="dlgSettings">
+    <form method="dialog" class="dlg">
+      <h2>Settings</h2>
+      <p id="settingsMsg" class="muted"></p>
+      <label class="field"><span>App password</span><input id="sPassword" type="password" autocomplete="current-password" /></label>
+      <div id="serverInfo" class="server-info"></div>
+      <div class="row gap">
+        <button class="btn primary" value="save" id="btnSaveSettings">Save</button>
+        <button class="btn ghost" value="cancel">Close</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="loading" id="loading" hidden>
+    <div class="loading-box">
+      <div class="scanner" aria-hidden="true"></div>
+      <p id="loadingText">Working…</p>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+  <script src="live.js"></script>
+</body>
+</html>
